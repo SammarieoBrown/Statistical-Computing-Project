@@ -1,0 +1,310 @@
+
+---
+output:
+pdf_document: default
+html_document: default
+---
+
+
+we c---
+title: "Assignment 2.1"
+output: html_notebook
+
+---
+
+Name: Sammarieo Brown
+ID: 620142596
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+
+### Package Management -> Importing the necessary packages that will be used in this project
+```{r, warning = FALSE}
+suppressWarnings(library(tibble))
+suppressWarnings(library(tidyr))
+suppressWarnings(library(haven))
+suppressWarnings(library(readr))
+suppressWarnings(library(dplyr))
+suppressWarnings(library(ggplot2))
+suppressWarnings(library(tidyverse))
+suppressWarnings(library(ggrepel))
+suppressWarnings(library(sjPlot))
+suppressWarnings(library(sjmisc))
+suppressWarnings(library(sjlabelled))
+suppressWarnings(library(corrplot))
+suppressWarnings(library(huxtable))
+suppressWarnings(library(rstatix))
+suppressWarnings(library(psych))
+suppressWarnings(library(rempsyc))
+suppressWarnings(library(kableExtra))
+suppressWarnings(library(ggstatsplot))
+suppressWarnings(library(ggpubr))
+suppressWarnings(library(gtsummary))
+suppressWarnings(library(see))
+suppressWarnings(library(performance))
+```
+
+### Date Pre-processing & Preparation
+1. Import dataset (SLC_2007.sav)
+2. Rename column headers to be more descriptive.
+3. convert the .sav file to a .csv file
+
+```{r}
+dataframe <- read_sav("F:/DataSpell/Statistical Computing Project/dataset/SLC_2007.sav")
+
+# rename column names to a more descriptive column name
+
+colnames(dataframe)[1:45] <- c("HH_Num", "Final_Weight", "Water_Bill", "HH_Size_All", "HH_Size_Mem", "Per_Cap_Con_All", "Per_Cap_Con_Mem", "Per_Cap_Pop_Quint", "Type_Dwelling", "Material_Walls", "Num_Rooms", "Type_Toilet", "Toilet_Shared", "Kitchen_Shared", "Own_Dwelling", "Other_Dwelling", "Renter", "Rent_Amt", "Rent_Period", "Rent_Helper", "Pay_Mortgage", "Mortgage_Payment", "Mortgage_Num", "Mortgage_Period", "Pay_Taxes", "Tax_Period", "Water_Source", "Water_Lock", "Water_Meter", "Water_Bill_Latest", "Water_Bill_Months", "Water_Source_Shared", "Water_Source_Dist", "Water_Source_Dist_Code", "Light_Source", "Electric_Bill", "Light_Bill_Months", "Own_Land_Tele", "Own_Cell_Tele", "Land_Tele_Bill", "Cell_Tele_Bill", "Land_Tele_Use", "Cell_Tele_Use", "Garbage_Dispose", "Area")
+
+# convert all the column names to lower case
+colnames(dataframe) <- tolower(colnames(dataframe))
+
+# coverting the SLC_2007.sav to csv
+
+converted_df <- write.table(x=dataframe,file="F:/DataSpell/Statistical Computing Project/dataset/SLC_2007.csv", quote = FALSE, sep = ",")
+
+```
+```{r}
+# Set the seed and take 90% of the random sample
+
+set.seed(710)
+
+# import dataset
+SLC_2007.Data <- read.csv("F:/DataSpell/Statistical Computing Project/dataset/SLC_2007.csv")
+
+
+# random sample
+n <- nrow(SLC_2007.Data)
+sample_size <- round(0.9 * n) # calculate the desired sample size as 90% of the total number of rows
+
+SLC_2007.Sample <- SLC_2007.Data[sample(seq_len(n), size = sample_size, replace = FALSE),] # take a random sample of the data set without replacement
+
+
+
+```
+# Subset of variables
+```{r}
+# create a sub dataset with the demographic variables
+SLC_2007.Subset <- select(SLC_2007.Sample, type_dwelling,
+                         toilet_shared,kitchen_shared,
+                          water_source,hh_size_all,
+                          per_cap_con_all,water_bill,water_source,area
+)
+
+
+```
+
+# Inferential Analysis
+
+### Goal 1: To determine if there is a difference in per capita water consumption based on location (area).
+- #### Test: One-way ANOVA
+
+```{r}
+
+# Select the columns from your dataset
+SLC_2007.Goal_1 <- select(SLC_2007.Subset, area, per_cap_con_all)
+
+SLC_2007.Goal_1 <- SLC_2007.Goal_1 %>%
+  mutate(area = recode(area,
+                               `1` = "KMA",
+                               `2` = "Other Town",
+                               `3` = "Rural",
+                       .default = "Unknown" # Add a default value for any unmatched value
+
+  )
+  )
+SLC_2007.Goal_1  <- SLC_2007.Goal_1 %>%
+  filter(area != "Unknown")
+
+
+# chekc for normality
+# Run the Linear Model
+aov.model.test <- lm(per_cap_con_all ~ area, data = SLC_2007.Goal_1)
+
+
+# Normality by Groups
+
+# Check normality by groups, ignoring NA values
+ggqqplot(na.omit(SLC_2007.Goal_1 ), "per_cap_con_all", facet.by = "area")
+
+```
+```{r}
+# chec for equal variance
+
+plot(aov.model.test,1)
+```
+```{r}
+# One-Way ANOVA Test
+aov.test <- aov(per_cap_con_all ~ area, data = SLC_2007.Goal_1)
+summary(aov.test)
+
+# Calculate r^2
+RSq <- var(predict(aov.test)) / var(SLC_2007.Goal_1$per_cap_con_all, na.rm = TRUE)
+round(RSq, 4)
+```
+```{r}
+# If significant, run post hoc (multiple comparisons) test
+pairwise.t.test(SLC_2007.Goal_1$per_cap_con_all, SLC_2007.Goal_1$area, p.adjust.method = "bonferroni")
+```
+
+```{r}
+# Load ggplot2 and ggpubr
+library(ggplot2)
+library(ggpubr)
+
+# Create the plot using ggbetweenstats()
+anova_plot <- ggbetweenstats(
+  data = SLC_2007.Goal_1,
+  x = area,
+  y = per_cap_con_all,
+  type = "parametric",
+  var.equal = TRUE,
+  plot.type = "box",
+  pairwise.comparisons = TRUE,
+  p.adjust.method = "bonferroni",
+  pairwise.display = "significant",
+  centrality.plotting = FALSE,
+  bf.message = FALSE
+)
+
+# Modify y-axis title
+anova_plot <- anova_plot +
+  ylab("Per Capita Water Consumption") +
+  xlab("Area")
+
+# Customize the theme to enlarge elements
+anova_plot <- anova_plot +
+  theme(
+    text = element_text(size = 16), # Increase base text size
+    axis.title = element_text(size = 18), # Increase axis title size
+    axis.text = element_text(size = 14), # Increase axis text size
+    plot.title = element_text(size = 20, face = "bold"), # Increase plot title size
+    strip.text = element_text(size = 16), # Increase facet label text size
+    legend.text = element_text(size = 14), # Increase legend text size
+    legend.title = element_text(size = 16), # Increase legend title size
+    panel.spacing = unit(1, "lines") # Increase space between facets
+  )
+
+# Display the plot
+anova_plot
+
+```
+
+
+
+### Goal 2: To determine if there is a difference in per capita water consumption based on whether toilet facilities are shared or not.
+- #### Test:  Independent Sample t-test
+
+```{r}
+
+
+# Prepare the dataset
+SLC_2007.Goal_2 <- select(SLC_2007.Subset, toilet_shared, per_cap_con_all)
+SLC_2007.Goal_2 <- SLC_2007.Goal_2 %>%
+        mutate(toilet_shared = recode(toilet_shared,
+                                      `1` = "EXCLUSIVE USE",
+                                      `2` = "SHARED",
+                                      .default = "Unknown" # Add a default value for any unmatched value
+        )
+        )
+
+# Run the independent sample t-test
+t_test_result <- SLC_2007.Goal_2 %>%
+        filter(toilet_shared != "Unknown") %>% # Remove rows with "Unknown" values
+        tbl_summary(
+                by = toilet_shared,
+                type = c(per_cap_con_all = "continuous"),
+                statistic = list(per_cap_con_all ~ "{mean} ({sd})"),
+                missing = "no",
+                label = list(
+                        per_cap_con_all ~ "Per Capita Water Consumption"
+                )
+        ) %>%
+        add_difference()
+
+# Display the result
+t_test_result
+
+
+
+
+```
+```{r}
+# Run the independent sample t-test using Version 2
+t_test_result_v2 <- nice_t_test(data = SLC_2007.Goal_2,
+                                response = "per_cap_con_all",
+                                group = "toilet_shared",
+                                warning = FALSE) %>%
+  nice_table()
+
+# Display the result
+t_test_result_v2
+```
+
+
+
+### Goal 3:To determine if there is a relationship between per capita water consumption and household size (add control – area, toilet, kitchen)
+- #### Test:  Multiple Linear Regression
+
+
+
+```{r}
+SLC_2007.Goal_3 <- select(SLC_2007.Subset, per_cap_con_all,hh_size_all,area,toilet_shared,kitchen_shared)
+# recode variables.
+SLC_2007.Goal_3 <- SLC_2007.Goal_3 %>%
+  mutate(
+    toilet_shared = recode(toilet_shared,
+                                `1` = "EXCLUSIVE USE",
+                                `2` = "SHARED"
+  ),
+    kitchen_shared = recode(kitchen_shared,
+                                 `1` = "EXCLUSIVE USE",
+                                 `2` = "SHARED",
+                                 `3` = "NONE"
+    ),
+    area = recode(area,
+                     `1` = "KMA",
+                     `2` = "Other Town",
+                     `3` = "Rural",
+                     .default = "Unknown" # Add a default value for any unmatched value
+
+    ),
+    hh_size_all = case_when(
+           hh_size_all == 1 ~ "1 person",
+           hh_size_all == 2 ~ "2 person",
+           hh_size_all == 3 ~ "3 person",
+           hh_size_all >= 4 ~ "4 or more"
+    )
+  )
+
+
+SLC_2007.Goal_3  <- SLC_2007.Goal_3 %>%
+  filter(area != "Unknown")
+
+print(head(SLC_2007.Goal_3))
+
+```
+```{r}
+# Convert nominal variables to factors
+SLC_2007.Goal_3_recoded <- SLC_2007.Goal_3 %>%
+  mutate(
+    toilet_shared = as.factor(toilet_shared),
+    kitchen_shared = as.factor(kitchen_shared),
+    area = as.factor(area),
+    hh_size_all = as.factor(hh_size_all)
+
+  )
+
+# Run the multiple linear regression model
+model <- lm(per_cap_con_all ~ hh_size_all + area + toilet_shared + kitchen_shared, data = SLC_2007.Goal_3)
+tab_model(model)
+
+```
+```{r}
+# Diagnostic Plots
+
+check_model(model)
+```
+
+

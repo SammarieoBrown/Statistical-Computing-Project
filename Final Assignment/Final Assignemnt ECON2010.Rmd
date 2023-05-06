@@ -1,0 +1,411 @@
+---
+title: "An Investigation of Individual Health and its Relationship with Socioeconomic
+  Factors Education, Gender, Per Capita Consumption, and the Location of Individuals
+  in Jamaica"
+author: "Rameze Thorpe ID:620140497"
+date: "`r Sys.Date()`"
+output: html_document
+---
+#### Setting Working Directory
+```{r}
+setwd("C:/Users/Rameze Thorpe/OneDrive/Desktop/Uwi Courses/Year 3/Semester 2/Statistical Computing/Assignment 2.1/DataSet")
+```  
+
+
+#### Loading R packages
+```{r message=FALSE, warning=FALSE}
+library(haven)
+library(tidyverse)
+library(tidyverse)
+library(gtsummary)
+library(dbplyr)
+library(scales)
+library(gapminder)
+library(qqplotr)
+library(latexpdf)
+library(rempsyc) # publishable tables
+library(ggplot2)
+library(ggpubr) # publishable graphs
+library(ggrepel)
+library(ggtext)
+library(dplyr)
+library(tidyverse)
+library(rstatix)
+library(gtsummary) # publishable tables
+library(knitr)
+library(kableExtra)
+library(ggstatsplot) # one-way anova plot
+library(PMCMRplus) # one-way anova plot pairwise comparisons
+library(nortest)
+# Anderson-Darling test - use when n > 5000
+library(jtools)
+library(sjPlot)
+library(sjlabelled)
+library(sjmisc)
+library(huxtable)
+library(rstatix)
+library(car)
+library(psych)
+```
+
+
+#### Loading SLC2004 data
+```{r}
+slc_2004 <- read_sav("C:/Users/Rameze Thorpe/OneDrive/Desktop/Uwi Courses/Year 3/Semester 2/Statistical Computing/Assignment 2.1/DataSet/SLC 2004.sav")
+```
+
+
+#### Exploration of Original data
+```{r}
+dim(slc_2004)
+head(slc_2004[ ,1:5])
+tail(slc_2004[ ,1:5])
+head(slc_2004[ ,100:106])
+tail(slc_2004[ ,100:106])
+
+```
+
+
+#### Setting random sampling seed
+```{r}
+set.seed(901)
+```
+
+
+#### Obtaining a sample size of 90% from the data set rows
+```{r}
+samplesize <- ceiling(dim(slc_2004)[1] *.9)
+
+slc_2004_sample <- slc_2004[sample(nrow(slc_2004), size = samplesize), ]
+```
+
+
+#### Checking frequency for variables Such as: sex,parish and b24 (Education) with respect the q24 (health)
+```{r}
+table(slc_2004_sample$q24, slc_2004_sample$sex)
+table(slc_2004_sample$q24, slc_2004_sample$parish)
+table(slc_2004_sample$q24, slc_2004_sample$b24)
+```
+
+# Data Wrangling
+Data wrangling, sometimes referred to as data munging, is the process of transforming and mapping data from one "raw" data form into another format with the intent of making it more appropriate and valuable for a variety of downstream purposes such as analytics.
+
+#### Obtaining a subset of slc_2004_sample
+```{r}
+slc_2004_subset <- select(slc_2004_sample, q24, q03, q23, sex, age, b24, parish, per_cap1, tot_exp, hhsize1,hhsize2)
+
+```
+
+
+#### Creating a data set that has been filter for N/A_
+```{r}
+slc_2004_subset2 <- slc_2004_subset %>%
+  filter(!is.na(q24))
+
+slc_2004_subset3 <- slc_2004_subset2 %>%
+  filter(!is.na(b24))
+
+slc_2004_subset4 <- slc_2004_subset3 %>% 
+  filter(!is.na(q03))
+
+slc_2004_subset4 <- slc_2004_subset3 %>% 
+  filter(!is.na(q23))
+
+slc_2004_subset4 <- slc_2004_subset3 %>% 
+  filter(!is.na(q24))
+
+```
+
+
+#### Adding columns to the data Sets
+```{r}
+slc_2004_subset3$health_dummy <- ifelse(
+  slc_2004_subset3$q24 < 4, 1,0) 
+# where 1 refers to good and 0 refers to bad health
+
+slc_2004_subset3$sex_dummy <- ifelse(
+  slc_2004_subset3$sex == 1, 1,0) 
+# where 1 refers to male and 0 refers to female
+
+
+slc_2004_subset3$edu_dummy <- ifelse(
+  slc_2004_subset3$b24 == 10 & 11, 1 ,0) 
+# where 1 refers to respondents getting education levels of tertiary or degree and 0 refers to education level otherwise.
+
+slc_2004_subset3$parish_dummy <- ifelse(
+  slc_2004_subset3$parish == 1 & 2, 1 ,0) 
+# where 1 refers to respondents living Kingston or st. Andrew and 0 referring to respondents living in other parts of Jamaica
+
+slc_2004_subset3$health_categories <- ifelse(
+  slc_2004_subset3$q24 < 4, "Good", "Bad") 
+# where respondents who choose {1,2,3} represents good health and {4,5} bad health
+
+slc_2004_subset3$sex_categories <- ifelse(
+  slc_2004_subset3$sex == 1, "Male","Female") 
+# where 1 refers to male and 0 refers to female
+
+slc_2004_subset3$edu_categories <- ifelse(
+  slc_2004_subset3$b24 == 10 & 11,"Educated" ,"Uneducated") 
+# where 10 & 11 refers to respondents who are educated and 1:9 and 12:13 refers to uneducated
+
+slc_2004_subset3$parish_categories <- ifelse(
+  slc_2004_subset3$parish == 1 & 2, "Kingston & St. Andrew" , "Other Parishes") 
+# where 1 & 2 refers to Kingston and St. Andrew and 3;14 refers to other parishes.
+
+slc_2004_subset4$status <- ifelse(
+  slc_2004_subset4$q24 < 4, 1,0)
+# where 1 refers to good and 0 refers to bad health.
+
+slc_2004_subset4$illness <- ifelse(
+  slc_2004_subset4$q03 == 2, 1,0)
+# where 1 refers to no showing signs of good health and 0 refers to yes showing signs of bad health.
+
+slc_2004_subset4$insurance <- ifelse(
+  slc_2004_subset4$q23 == 4, 1,0)
+
+# where 1 refers to no health insurance and 0 refers to yes health insurance whether private, public or both
+```
+
+
+#### Reliability Analysis (Internal Consistency)
+```{r}
+Cron_Cols <- c("status", "illness", "insurance")
+#Listing the names of the columns (variables) that will be included in the index.
+
+Cron.Alpha <- alpha(slc_2004_subset4[, Cron_Cols])
+Cron.Alpha
+```
+
+
+#### Index Creation
+```{r}
+slc_2004_subset4$healthindex <- (slc_2004_subset4$status + slc_2004_subset4$illness + slc_2004_subset4$insurance)/3
+
+slc_2004_subset3$healthindex <- (slc_2004_subset4$status + slc_2004_subset4$illness + slc_2004_subset4$insurance)/3
+```
+
+# Data Visulization 
+Data visualization is the representation of data through use of common graphics, such as charts, plots, infographics, and even animations. These visual displays of information communicate complex data relationships and data-driven insights in a way that is easy to understand.
+
+#### Representation of Demographic Variables 
+```{r}
+slc_2004_subset3 %>% select(health_categories, age, hhsize2) %>%
+tbl_summary(by = health_categories, 
+            missing = "no",
+            statistic = list(all_continuous() ~ "{mean} ({sd})"),
+            label = list( 
+            age ~ "Age",
+            hhsize2 ~ "Holdhold Size - Members Only"))
+
+ggplot(slc_2004_subset3, aes(x = sex_categories)) +
+        geom_bar(aes(y = ..count..), fill = "blue") +
+        geom_text(aes(label = ..count..), stat = "count", vjust = 0.05, 
+        colour = "red")+ labs(x = "Gender", y = "Count Frequency") +
+        theme_dark()
+
+slc_2004_subset3 %>% select(health_categories, sex_categories) %>%
+tbl_summary(by = sex_categories, 
+            missing = "no",
+            statistic = list(all_continuous() ~ "{mean} ({sd})"),
+           label = list( 
+           health_categories ~ "Health Status"))
+        
+ggplot(slc_2004_subset3, aes(x = parish_categories)) +
+        geom_bar(aes(y = ..count..), fill = "blue") +
+        geom_text(aes(label = ..count..), stat = "count", vjust = 0.05, 
+        colour = "red")+ labs(x = "Geographic Location", y = "Count                   Frequency") +
+        theme_dark()
+        
+slc_2004_subset3 %>% select(health_categories, parish_categories) %>%
+tbl_summary(by = parish_categories, 
+            missing = "no",
+            statistic = list(all_continuous() ~ "{mean} ({sd})"),
+            label = list( 
+            health_categories ~ "Health Status"))
+```
+
+#### Represenation of key Variables
+```{r}
+ggplot(slc_2004_subset3, aes(x = health_categories)) +
+        geom_bar(aes(y = ..count..), fill = "blue") +
+        geom_text(aes(label = ..count..), stat = "count", vjust = 0.05, colour         = "red")+ labs(x = "Health Status", y = "Count Frequency") +
+        theme_dark()
+        
+ggplot(slc_2004_subset3, aes(x = edu_categories)) +
+        geom_bar(aes(y = ..count..), fill = "blue") +
+        geom_text(aes(label = ..count..), stat = "count", vjust = 0.05, colour         = "red")+ labs(x = "Education Status", y = "Count Frequency") +
+        theme_dark()    
+        
+slc_2004_subset3 %>% select(health_categories, edu_categories) %>%
+tbl_summary(by = edu_categories, 
+            missing = "no",
+            statistic = list(all_continuous() ~ "{mean} ({sd})"),
+           label = list( 
+           health_categories ~ "Health Status"))
+
+
+options(scipen = 999)
+ggplot(data = slc_2004_subset3, aes(x = tot_exp,)) +                        geom_histogram(color = "white" ,fill = "blue") +
+       labs(x = "Total Annual Expenditure") + theme_dark()
+
+slc_2004_subset3 %>%
+        group_by(sex_categories) %>%
+        select(tot_exp) %>%
+        tbl_summary(
+        statistic = list(all_continuous() ~ "{min}, {mean}, {median}, {max},           {sd},{IQR}"),
+        label = list( 
+        sex_categories ~ "Gender"))
+
+ggplot(data = slc_2004_subset3, aes(x = health_categories, y = tot_exp)) +
+       geom_boxplot(color = "white", fill = "blue") +
+       labs(x = "Health Status", y = "Total Annual Expenditure") + theme_dark()
+
+slc_2004_subset3 %>% select(health_categories, tot_exp) %>%
+tbl_summary(
+            by = health_categories, 
+            missing = "no",
+            statistic = list(all_continuous() ~ "{mean} ({sd}) {median}"),
+            label = list( 
+            tot_exp ~ "Total Annual Expenditure"))
+
+ggplot(data = slc_2004_subset3, aes(x = hhsize2, y = tot_exp,)) +
+       geom_point(color = "white", fill = "blue")+
+       geom_smooth(fill = 'red')+
+       labs(x = "Household Size", y = "Total Annual Expenditure") +                   theme_dark()
+
+slc_2004_subset3 %>% select(sex_categories, tot_exp) %>%
+tbl_summary(
+            by = sex_categories, 
+            missing = "no",
+            statistic = list(all_continuous() ~ "{mean} ({sd})"))
+
+```
+
+
+# Inferential Statistics
+Inferential statistics can be defined as a field of statistics that uses analytically tools for drawing conclusions about a population by examining random samples. The goal of inferential statistics is to make generalizations about a population.
+
+#### Two sample proportion test
+```{r}
+# Two sample proportion test was used to compare the difference in the proportion of individuals having a good or bad health status with respect to there gender; being a male or female
+
+# variable ~ sex_categories
+# group ~ health_categories
+
+options(scipen = 999)
+ggbarstats(
+  data = slc_2004_subset3,
+ y =sex_categories,
+ x = health_categories,
+ label = " both ",
+ bf.message = FALSE,) +
+labs(x = "Gender")
+
+```
+
+#### Independent sample t - test & Mann - Whitney test
+```{r}
+# Conducting an appropriate t -test to determine if there is a difference in the per capita consumption of individuals having a good or bad health status.
+
+# Due to the nature of the question an independent sample t - test seems most appropriate.
+
+# Checking Assumptions for Independent sample t - test 
+n1 <- 3417
+n2 <- 272
+
+total <- n1 + n2
+print(total)
+
+
+# since the total is greater than 40 we are going to check for outlier in the per capita consumption variable.
+
+slc_2004_subset3 %>% 
+                ggplot(aes(y = per_cap1, x = health_categories)) +
+                geom_boxplot()
+
+# from the box plot we can see there is a lot of outliers hence the independent sample t test assumption is violated. Therefore the non parametric Mann Whitney test should be used to get a more accurate output.
+
+# However for project purposes both test results will be used.
+
+#Independent sample t-test version 1
+t.test.results.1 <- 
+  slc_2004_subset3 %>%
+  select(per_cap1, health_categories) %>%
+  tbl_summary(
+  by = health_categories,
+  type = c(per_cap1 = "continuous"),
+  statistic = list(per_cap1 ~ "{mean} ({sd})"),
+  missing = "no",
+  label = list(per_cap1 ~ "Per Capita Consumption"))%>% 
+  add_difference()
+
+t.test.results.1
+
+#independent sample t-test version 2
+nice_t_test(data = slc_2004_subset3,
+  response = "per_cap1",
+  group = "health_categories",
+  warning = FALSE) |>
+  nice_table()
+
+#effect size
+one.t.effect <- slc_2004_subset3 %>% cohens_d ( per_cap1 ~ health_categories,
+mu = 45 )
+one.t.effect
+
+#Mann _ Whitney test
+wilcox.test(slc_2004_subset3$per_cap1, slc_2004_subset3$health_dummy)
+
+-----------------------------------------------------
+slc_2004_subset3 %>% 
+                ggplot(aes(y = healthindex, x = sex_categories)) +
+                geom_boxplot()
+
+#Independent sample t-test version 1
+t.test.results.2 <- 
+  slc_2004_subset3 %>%
+  select(healthindex, sex_categories) %>%
+  tbl_summary(
+  by = sex_categories,
+  type = c(healthindex = "continuous"),
+  statistic = list(healthindex ~ "{mean} ({sd})"),
+  missing = "no",
+  label = list(healthindex~ "Health Index"))%>% 
+  add_difference()
+
+t.test.results.2
+
+#independent sample t-test version 2
+nice_t_test(data = slc_2004_subset3,
+  response = "healthindex",
+  group = "sex_categories",
+  warning = FALSE) |>
+  nice_table()
+
+#effect size
+one.t.effect <- slc_2004_subset3 %>% cohens_d ( healthindex ~ sex_categories,
+mu = 45 )
+one.t.effect
+
+```
+
+#### Logistic Regression & Correlation Matrix
+```{r}
+# The logistics regression was used because our dependent variable health status is a binary/dummy variable.Specifically we are looking at how individuals health status is related to gender, age, education, location and per capita consumption
+
+#Logistic Regression
+options(scipen = 999)
+LogitModel1  <- glm( health_dummy ~ sex_dummy + age + edu_dummy + parish_dummy + per_cap1, data = slc_2004_subset3 , family = "binomial")
+
+LogitModel1
+
+#Tabulated Output for Logistic Regression
+tab_model(LogitModel1 )
+
+#Diagnostics for Multiple Logistic regression
+Vif1 <- vif(LogitModel1)
+Vif1
+
+```
+
+

@@ -1,0 +1,2 @@
+setwd("F:/DataSpell/Statistical Computing Project/Final Assignment")
+rmarkdown::render("final-assignment.rmd", output_format = "pdf_document")

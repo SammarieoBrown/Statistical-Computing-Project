@@ -1,0 +1,425 @@
+---
+output:
+
+  html_document: default
+  pdf_document: default
+---
+
+
+we c---
+title: "Assignment 2.1"
+output: html_notebook
+
+---
+
+# Description of Demographics
+In this section, describe all the demographic variables that you intend to use in your
+analysis. In addition to your write-up, it should include relevant numerical measures
+(including tables) and graphs.
+
+
+Name: Sammarieo Brown
+ID: 620142596
+
+
+
+### Package Management -> Importing the necessary packages that will be used in this project
+```{r}
+
+library(tibble)
+library(tidyr)
+library(haven)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(ggrepel)
+
+
+```
+### Date Pre-processing & Preparation
+1. Import dataset (SLC_2007.sav)
+2. Rename column headers to be more descriptive.
+3. convert the .sav file to a .csv file
+```{r}
+dataframe <- read_sav("F:/DataSpell/Statistical Computing Project/dataset/SLC_2007.sav")
+
+# rename column names to a more descriptive column name
+
+colnames(dataframe)[1:45] <- c("HH_Num", "Final_Weight", "Water_Bill", "HH_Size_All", "HH_Size_Mem", "Per_Cap_Con_All", "Per_Cap_Con_Mem", "Per_Cap_Pop_Quint", "Type_Dwelling", "Material_Walls", "Num_Rooms", "Type_Toilet", "Toilet_Shared", "Kitchen_Shared", "Own_Dwelling", "Other_Dwelling", "Renter", "Rent_Amt", "Rent_Period", "Rent_Helper", "Pay_Mortgage", "Mortgage_Payment", "Mortgage_Num", "Mortgage_Period", "Pay_Taxes", "Tax_Period", "Water_Source", "Water_Lock", "Water_Meter", "Water_Bill_Latest", "Water_Bill_Months", "Water_Source_Shared", "Water_Source_Dist", "Water_Source_Dist_Code", "Light_Source", "Electric_Bill", "Light_Bill_Months", "Own_Land_Tele", "Own_Cell_Tele", "Land_Tele_Bill", "Cell_Tele_Bill", "Land_Tele_Use", "Cell_Tele_Use", "Garbage_Dispose", "Area_Code")
+
+# convert all the column names to lower case
+colnames(dataframe) <- tolower(colnames(dataframe))
+
+# coverting the SLC_2007.sav to csv
+
+converted_df <- write.table(x=dataframe,file="F:/DataSpell/Statistical Computing Project/dataset/SLC_2007.csv", quote = FALSE, sep = ",")
+
+```
+
+
+Set the seed and take 90% of the random sample
+
+
+
+```{r}
+
+set.seed(710)
+
+# import dataset
+SLC_2007.Data <- read.csv("F:/DataSpell/Statistical Computing Project/dataset/SLC_2007.csv")
+
+
+# random sample
+n <- nrow(SLC_2007.Data)
+sample_size <- round(0.9 * n) # calculate the desired sample size as 90% of the total number of rows
+
+SLC_2007.Sample <- SLC_2007.Data[sample(seq_len(n), size = sample_size, replace = FALSE),] # take a random sample of the data set without replacement
+
+
+print(colnames(SLC_2007.Sample))
+```
+```{r}
+# create a sub dataset with the demographic variables
+SLC_2007.Subset <- select(SLC_2007.Sample,
+                          area_code,type_dwelling,
+                          type_toilet,toilet_shared,kitchen_shared,own_dwelling,
+                          water_source,area_code,hh_size_all,hh_size_mem,
+                          per_cap_con_all,water_bill,water_source, water_bill_latest
+
+)
+print(colnames(SLC_2007.Subset))
+
+print(head(SLC_2007.Subset))
+```
+## Data Wrangling
+This process of the Data Science lifecycle involves cleaning, transforming and restructuring  the raw data to make it suitable for analysis.
+
+
+
+```{r}
+
+# rename all the elements of the rows in our subset to labels.
+
+SLC_2007.Subset <- SLC_2007.Subset %>%
+  rename(
+    area_code = area_code,
+    type_dwelling = type_dwelling,
+    type_toilet = type_toilet,
+    toilet_shared = toilet_shared,
+    kitchen_shared = kitchen_shared,
+    own_dwelling = own_dwelling,
+    water_source = water_source,
+
+  ) %>%
+  mutate(
+    area_code = case_when(
+      area_code == 1 ~ "KMA",
+      area_code == 2 ~ "Other Town",
+      area_code == 3 ~ "Rural",
+      TRUE ~ as.character(area_code) # keep original value if not matched
+    ),
+    type_dwelling = case_when(
+      type_dwelling == 1 ~ "SEPARATE HOUSE DETACHED",
+      type_dwelling == 2 ~ "SEMI-DETACHED HOUSE",
+      type_dwelling == 3 ~ "PARTS OF A HOUSE",
+      type_dwelling == 4 ~ "APARTMENT BUILDING",
+      type_dwelling == 5 ~ "TOWNHOUSE",
+      type_dwelling == 6 ~ "IMPROVISED HOUSING UNIT",
+      type_dwelling == 7 ~ "PARTS OF COMMERCIAL BUILDING",
+      type_dwelling == 8 ~ "OTHER (SPECIFY)",
+      TRUE ~ as.character(type_dwelling) # keep original value if not matched
+    ),
+
+    type_toilet = case_when(
+      type_toilet == 1 ~ "W.C. LINKED TO SEWER",
+      type_toilet == 2 ~ "W.C. NOT LINKED",
+      type_toilet == 3 ~ "PIT",
+      type_toilet == 4 ~ "OTHER",
+      type_toilet == 5 ~ "NONE",
+      TRUE ~ as.character(type_toilet) # keep original value if not matched
+    ),
+    toilet_shared = case_when(
+      toilet_shared == 1 ~ "EXCLUSIVE USE",
+      toilet_shared == 2 ~ "SHARED",
+      TRUE ~ as.character(toilet_shared) # keep original value if not matched
+    ),
+    kitchen_shared = case_when(
+      kitchen_shared == 1 ~ "EXCLUSIVE USE",
+      kitchen_shared == 2 ~ "SHARED",
+      kitchen_shared == 3 ~ "NONE",
+      TRUE ~ as.character(kitchen_shared) # keep original value if not matched
+    ),
+    own_dwelling = case_when(
+      own_dwelling == 1 ~ "YES",
+      own_dwelling == 2 ~ "NO",
+      TRUE ~ as.character(own_dwelling) # keep original value if not matched
+    ),
+    water_source = case_when(
+      water_source == 1 ~ "Indoor tap/pipe",
+      water_source == 2 ~ "Outside private",
+      water_source == 3 ~ "Public standpipe",
+      water_source == 4 ~ "Well",
+      water_source == 5 ~ "River, Lake, Spring, Pond",
+      water_source == 6 ~ "Rainwater (Tank)",
+      water_source == 7 ~ "Trucked water (NWC)",
+      water_source == 8 ~ "Bottled Water",
+      water_source == 9 ~ "Other (Specify)",
+
+      TRUE ~ as.character(water_source) # keep original value if not matched
+    ),
+
+  )
+
+print(head(SLC_2007.Subset))
+
+```
+
+# Data Visualization
+
+
+
+### Description of Demographic Variables
+
+
+```{r}
+
+library(tidyverse)
+library(gtsummary)
+library(gapminder)
+
+SLC_2007.Subset2 <- SLC_2007.Subset %>%
+        rename("Area Code" = area_code)
+
+table1 <- SLC_2007.Subset2 %>%
+        select("Area Code") %>%
+        filter(!(`Area Code` %in% c(4, 5))) %>% # exclude Area Codes 4 and 5
+        tbl_summary(
+                missing = "no"
+        ) %>%
+        add_n() %>%
+        modify_header(label = "**Characteristic**") %>%
+        bold_labels()
+
+table1
+
+
+
+
+
+
+```
+
+```{r}
+SLC_2007.Subset2 <- SLC_2007.Subset %>%
+        rename("Type of Toilet" = type_toilet)
+table2 <- SLC_2007.Subset2 %>%
+        select("Type of Toilet") %>%
+        tbl_summary(
+                missing = "no"
+        ) %>%
+        add_n() %>% # add column with total number of non-missing observations
+        modify_header(label = "**Characteristic**") %>% # update the column header
+        bold_labels()
+
+
+
+table2
+
+
+
+```
+
+```{r}
+ggplot(SLC_2007.Subset, aes(x = kitchen_shared)) +
+        geom_bar(aes(y = ..count..), fill = "#619CFF") +
+        labs(
+             x = "Kitchen Sharing",
+             y = "Count Frequency") +
+        geom_text(aes(label = ..count..), stat = "count", vjust = 0.01, colour = "black")+
+        theme_minimal()
+
+
+
+
+```
+```{r}
+library(ggplot2)
+
+ggplot(SLC_2007.Subset, aes(x = toilet_shared)) +
+        geom_bar(fill = "#619CFF") +
+        labs(
+             x = "Toilet Sharing",
+             y = "Frequency") +
+        scale_x_discrete(labels = c("Exclusive Use", "Shared")) +
+        geom_text(aes(label = ..count..), stat = "count", vjust =0.01, colour = "black")+
+
+        theme_minimal()
+
+
+
+
+```
+
+
+
+# Description of Key Variables
+
+
+
+
+
+```{r}
+# Calculate correlation coefficient and format as table
+cor_table <- data.frame(Correlation = round(cor(SLC_2007.Subset$per_cap_con_all, SLC_2007.Subset$hh_size_all), 4))
+rownames(cor_table) <- "per_cap_con_all vs. hh_size_all"
+cor_table
+
+
+```
+
+```{r}
+# Generate summary table of water_bill variable
+summary(SLC_2007.Subset$water_bill)
+
+```
+
+
+
+
+
+```{r}
+# Remove rows with missing values
+SLC_2007.Subset <- na.omit(SLC_2007.Subset)
+
+# Add first principal component
+SLC_2007.Subset$pc <- predict(prcomp(~per_cap_con_all + water_bill, SLC_2007.Subset))[,1]
+
+# Add density for each point
+SLC_2007.Subset$density <- fields::interp.surface(
+        MASS::kde2d(SLC_2007.Subset$per_cap_con_all, SLC_2007.Subset$water_bill), SLC_2007.Subset[,c("per_cap_con_all", "water_bill")])
+
+# Plot with title
+ggplot(SLC_2007.Subset, aes(per_cap_con_all, water_bill, color = pc, alpha = 1/density)) +
+        geom_point(shape = 16, size = 5, show.legend = FALSE) +
+
+        theme_minimal() +
+        scale_color_gradient(low = "#2473c5", high = "#f2aeff") +
+        scale_alpha(range = c(.25, .6)) +
+        labs(#title = "Relationship between Per Capita Consumption and Water Bill with PC and density",
+             x = "Per Capita Consumption",
+             y = "Water Bill")
+
+
+
+
+
+```
+
+
+
+
+```{r}
+# Remove rows with missing values
+SLC_2007.Subset <- na.omit(SLC_2007.Subset)
+
+# Add first principal component
+SLC_2007.Subset$pc <- predict(prcomp(~hh_size_all + per_cap_con_all, SLC_2007.Subset))[,1]
+
+# Add density for each point
+SLC_2007.Subset$density <- fields::interp.surface(
+        MASS::kde2d(SLC_2007.Subset$hh_size_all, SLC_2007.Subset$per_cap_con_all), SLC_2007.Subset[,c("hh_size_all", "per_cap_con_all")])
+
+# Plot with title and updated y-axis label and variable
+ggplot(SLC_2007.Subset, aes(hh_size_all, per_cap_con_all, color = pc, alpha = 1/density)) +
+        geom_point(shape = 16, size = 5, show.legend = FALSE) +
+        geom_smooth(fill='red') +
+        theme_minimal() +
+        scale_color_gradient(low = "#2473c5", high = "#f2aeff", guide = "none") +
+        scale_alpha(range = c(.25, .6), guide = "none") +
+        labs(#title = "Relationship between Household Size and Per Capita Consumption with PC and density",
+                x = "Household Size",
+                y = "Per Capita Consumption")
+
+```
+```{r}
+
+
+# Remove rows with missing values
+SLC_2007.Subset <- na.omit(SLC_2007.Subset)
+
+# Add first principal component
+SLC_2007.Subset$pc <- predict(prcomp(~hh_size_all + water_bill, SLC_2007.Subset))[,1]
+
+# Add density for each point
+SLC_2007.Subset$density <- fields::interp.surface(
+        MASS::kde2d(SLC_2007.Subset$hh_size_all, SLC_2007.Subset$water_bill), SLC_2007.Subset[,c("hh_size_all", "water_bill")])
+
+# Plot with title and updated y-axis label and variable
+ggplot(SLC_2007.Subset, aes(hh_size_all, water_bill, color = pc, alpha = 1/density)) +
+        geom_point(shape = 16, size = 5, show.legend = FALSE) +
+        theme_minimal() +
+        scale_color_gradient(low = "#2473c5", high = "#f2aeff") +
+        scale_alpha(range = c(.25, .6)) +
+        labs(title = "Relationship between Household Size and Water Bills with PC and density",
+             x = "Household Size",
+             y = "Water Bills")
+
+```
+
+
+
+```{r}
+# Remove rows with missing values
+SLC_2007.Subset <- na.omit(SLC_2007.Subset)
+
+# Group water source categories
+SLC_2007.Subset$water_source_group <- ifelse(SLC_2007.Subset$water_source %in% c("Public tap/standpipe", "Tube well/borehole"), "Piped water", SLC_2007.Subset$water_source)
+
+# Transform water consumption variable by  logarithmic  transformation to compress the range of values.
+SLC_2007.Subset$log_per_cap_con_all <- log(SLC_2007.Subset$per_cap_con_all)
+
+# Create boxplot of water consumption by water source without outliers
+ggplot(SLC_2007.Subset, aes(water_source_group, log_per_cap_con_all)) +
+        geom_boxplot(fill = "#32aeff", alpha = 0.8, outlier.color = NA, outlier.shape = NA) +
+        theme_minimal() +
+        labs(title = "Distribution of Water Consumption by Water Source",
+             x = "Water Source",
+             y = "Log Per Capita Water Consumption")
+
+```
+
+
+```{r}
+# Summarize water consumption by water source
+water_summary <- aggregate(per_cap_con_all ~ water_source, SLC_2007.Subset, FUN = sum)
+
+# Create bar graph of water consumption by water source
+ggplot(water_summary, aes(x = water_source, y = per_cap_con_all, fill = per_cap_con_all)) +
+        geom_bar(stat = "identity", color = "black", show.legend = FALSE) +
+        scale_fill_gradient(low = "#2473c5", high = "#f2aeff", guide = FALSE) +
+        geom_text(aes(label = format(round(per_cap_con_all, 2), big.mark = ","), y = per_cap_con_all), vjust = -0.5, size = 3.5) +
+        theme_minimal() +
+        labs(#title = "Water Consumption by Water Source",
+             x = "Water Source",
+             y = "Total Water Consumption")
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

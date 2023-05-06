@@ -1,0 +1,408 @@
+---
+title: "ECON3032: <br> Statistical Estimation and Inference - Assignment"
+author: "Sammarieo Brown - ID: 620142596"
+date: "Friday, April 8, 2022 at 12pm"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+<br>
+<br>
+<br>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Method of Moments Estimation - a Bootstrapping Study
+
+<br>
+<br>
+<br>
+<span style="color: blue;">
+The size of defaults on loans can be approximated by a gamma distribution with shape parameter = $\alpha = 1$ and the rate parameter = $\beta = 1/200$.  The aim of this assignment is to use bootstrapping to obtain the method of moments estimators $\hat{\alpha}_{MOM}$ and $\hat{\beta}_{MOM}$.   
+ </span>
+<br>
+<br>
+
+<span style="color: blue;">
+1. What type of distribution (discrete or continuous) is the amount of a loan default? Explain your answer.</span>
+
+
+
+The amount of a loan default is a continuous distribution. This is because the size of defaults on loans can take on any value within a continuous range, rather than being limited to a fixed set of discrete values. In this case, the gamma distribution, which is a continuous distribution, is used to approximate the size of loan defaults. The gamma distribution is defined on the interval [0, ∞), which allows for a wide range of possible loan default amounts.
+
+<br>
+<br>
+<br>
+<br>
+<br>
+
+```{r message = FALSE, warning = FALSE}
+rm(list = ls()) # Clear work environment
+
+# Set Working Directory
+#setwd("~/ECON3032/Assignment")
+
+# Load the Necessary Libraries
+library(psych) # gives complete summary table
+
+library(kableExtra) # for nice html table
+
+library(ggplot2) # gives nice plots
+
+library(MASS) # gives fits of density parameters
+
+library(EnvStats) # for coefficient of variation
+
+
+
+
+```
+
+
+<!-- % Import the data file -->
+```{r}
+# Import the original file
+LoanDefaults <- read.csv("E:/DataSpell/Statistical Computing Project/ECON3032 Assignment/LoanDefaults.csv")
+
+
+
+```
+
+<br>
+<br>
+
+<span style="color: blue;">
+2. Before beginning the study, calculate the mean and standard deviation of the original dataset.</span>
+
+```{r}
+kable(round(describe(LoanDefaults[,2]), 3)) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+
+```
+
+<br>
+<br>
+
+
+
+<span style="color: blue;">
+3. Get the parameters for the original distribution. Do the estimated parameters seem to match the distribution in the introduction?  Give reasons for your answer. </span>
+
+
+```{r warning=FALSE}
+LoanDefault.Vec <- LoanDefaults$x
+fit.params <- fitdistr(LoanDefault.Vec,"gamma")  # gives the maximum likelihood parameter estimates based on the distribution 
+fit.params
+
+
+```
+
+
+
+The estimated parameters for the original distribution are obtained using the fitdistr() function from the MASS library, which provides the maximum likelihood parameter estimates for the gamma distribution. The estimated parameters are:
+
+1. Shape (α): 1.003452e+00 (approximately 1)
+2. Rate (β): 5.023309e-03 (approximately 1/200)
+3.
+These estimated parameters seem to match the distribution described in the introduction, where the shape parameter (α) is 1 and the rate parameter (β) is 1/200. The slight differences between the estimated parameters and the original distribution parameters can be attributed to sampling variability and the method used for estimation (maximum likelihood estimation in this case). Overall, the estimated parameters are close to the original distribution parameters, which suggests that the gamma distribution with these parameters is an appropriate model for the loan default data.
+<br>
+<br>
+<br>
+<br>
+
+
+
+
+<!-- % First set your random seed -->
+<!-- % REPLACE 123 in the brackets with the seed value beside your ID# in the assignment -->
+
+```{r}
+# Set the sampling seed for reproducibility
+set.seed(1300)
+```
+
+<!-- % Select the sample that you will work with -->
+<!-- % Change 1000 to the NEW SIZE assigned to your ID# -->
+```{r}
+# Select a random sample of data points from the original dataset
+Loan.data <- LoanDefaults[sample(nrow(LoanDefaults), 67000), ]
+
+Loan.data.Vec <- Loan.data$x
+den <- density(Loan.data.Vec)
+dat <- data.frame(x = den$x, y= den$y)
+
+```
+<br>
+<br>
+<br>
+
+
+<span style="color: blue;">
+4. Plot the data along with superimposed density curve. How well do you think your data (the points in black) fit the assumed density curve (the line in red)? </span>  
+
+<br>
+<!-- % You may change the colours assigned below.  Just ensure that your graph and colours are easily seen -->
+
+```{r}
+
+h <- hist(Loan.data.Vec, 150, plot=FALSE)
+t1 <- data.frame(x = h$mids, y = h$density)
+
+ggplot(data = t1, aes(x = x, y = y)) + 
+  geom_point(size = 3) +
+  geom_line(aes(x=x, y=dgamma(x,1, 0.005)), color="red", size = 1) + 
+  theme_classic()
+
+```
+
+
+
+
+
+Based on the plot with the data points in black and the superimposed density curve in red, it appears that the data fits the assumed gamma density curve quite well. The distribution of the data points closely follows the shape of the red density curve, suggesting that the gamma distribution with the given shape and rate parameters is an appropriate model for the loan default data.
+<br>
+<br>
+<br>
+<br>
+
+
+<span style="color: blue;">
+4. The method of moments estimators for the parameters of the gamma distribution are given as follows:
+
+$$\begin{equation}
+ \hat{\beta}_{MOM} = \dfrac{\bar{X}}{\dfrac{1}{n}\sum{_{i = 1}^{n}  X_i^2} - (\bar{X})^2}
+\end{equation}$$
+
+<span style="color: blue;">
+and</span>
+
+$$\begin{equation}
+ \hat{\alpha}_{MOM} =   \dfrac{(\bar{X})^2}{\dfrac{1}{n}\sum{_{i = 1}^{n}  X_i^2} - (\bar{X})^2} = \hat{\beta}_{MOM} \bar{X}
+\end{equation}$$
+
+
+
+<span style="color: blue;">
+To investigate the method of moments estimators, draw x number of samples of size y and calculate $\bar{X}$ and $\dfrac{1}{n}\sum{_{i = 1}^{n}  X_i^2}$.</span>  
+
+
+<!-- % Change 1000 to the NUMBER OF SAMPLES (REPLICATIONS) you have been assigned -->
+<!-- % Change 50 to the SAMPLE SIZE you have been assigned -->
+```{r}
+# Set up the vector to hold the values of xbar and sum of x^2 divided by n
+
+xbar <- rep(0,2500)
+x2bar <- rep(0,2500)
+
+
+# Draw repeated samples from the dataset and calculate the estimators - This is called a For Loop
+for (i in 1:2500){
+  xx <- sample(LoanDefault.Vec, size = 2600, replace = FALSE)
+  xbar[i]<-mean(xx)
+  x2bar[i]<-mean(xx^2)
+  }
+
+
+```
+<br>
+<br>
+<br>
+<br>
+
+<span style="color: blue;">
+5. For each sample, calculate $\hat{\alpha}_{MOM}$ and $\hat{\beta}_{MOM}$</span>.
+
+```{r}
+betahat <- xbar/(x2bar-xbar^2)
+alphahat <- betahat*xbar
+```
+<br>
+<br>
+<br>
+<br>
+
+
+<span style="color: blue;">
+6. Without doing any calculations, what should be the values of $\hat{\alpha}_{MOM}$ and $\hat{\beta}_{MOM}$?  Given reasons for your answer.</span>.
+
+
+
+The values of α^MOM and β^MOM should be close to the true parameters of the gamma distribution, which were provided in the introduction. This is because the method of moments estimators aims to match the moments of the sample with the moments of the distribution, resulting in estimators that approximate the true distribution parameters.
+
+In this case, the true shape parameter (α) is 1, and the true rate parameter (β) is 1/200. Therefore, we would expect the method of moments estimators α^MOM and β^MOM to be close to these values. Keep in mind that the estimators may not exactly match the true parameters due to sampling variability, but they should provide a reasonable approximation.
+
+<br>
+<br>
+<br>
+<br>
+
+
+<span style="color: blue;">
+7. Calculate the summary statistics for each estimator.</span>.
+
+<br>
+<br>
+Summary Statistics for $\hat{\beta}$
+
+```{r}
+kable(round(describe(betahat), 3)) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+```
+
+<br>
+<br>
+Summary Statistics for $\hat{\alpha}$
+
+```{r}
+kable(round(describe(alphahat), 3)) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+```
+<br>
+<br>
+<br>
+<br>
+
+
+<span style="color: blue;">
+8. How do you think each estimator is distributed? Why?</span>.
+
+Distribution for $\hat{\beta}$
+<br>
+
+The summary statistics for the estimators of β^ (β^MOM) show a mean close to 0.005, which is approximately 1/200 (the true rate parameter), and a small standard deviation, indicating that the distribution of the estimator is relatively concentrated around the mean value. The skewness is slightly positive, suggesting a somewhat right-skewed distribution, while the kurtosis is negative, which indicates that the distribution might be more flat-topped (platykurtic) compared to a normal distribution.
+<br>
+<br>
+<br>
+<br>
+
+Distribution for $\hat{\alpha}$
+<br>
+
+As for the distribution of α^ (α^MOM), the summary statistics reveal a mean close to 1 (the true shape parameter), a small standard deviation, and a median very close to the mean, indicating that the distribution is also concentrated around the mean value. The skewness and kurtosis are both close to zero, which suggests that the distribution of the α^MOM estimator is approximately symmetric and has a shape similar to a normal distribution.
+
+Both estimators are expected to be approximately normally distributed based on the central limit theorem, as they are computed from a large number of random samples drawn from the population. However, the actual distribution might slightly deviate from normality due to factors like the sample size and the shape of the underlying distribution. In conclusion, both estimators seem to be reasonably well distributed around the true parameter values, with β^MOM having a slightly skewed and flatter distribution, while α^MOM being more symmetric and closer to a normal distribution.
+<br>
+<br>
+<br>
+<br>
+
+<span style="color: blue;">
+9. Plot the distributions of each estimator.  Is the distribution what you expected from Question 8? Explain. </span>
+
+
+
+```{r}
+par(mfrow=c(1,2)) # Create plots side by side
+
+hist(betahat, prob=TRUE, col="grey", main = "Distribution of Beta-Hat", xlab = "Values of Beta-Hat")# prob=TRUE for probabilities not counts
+lines(density(betahat), col="blue", lwd=2) # add a density estimate with defaults
+
+
+hist(alphahat, prob=TRUE, col="grey", main = "Distribution of Alpha-Hat", xlab = "Values of Alpha-Hat")# prob=TRUE for probabilities not counts
+lines(density(alphahat), col="blue", lwd=2) # add a density estimate with defaults
+
+
+```
+
+Based on the histograms and density plots for both estimators, the distribution of β^MOM and α^MOM appears to be consistent with the expectations from Question 8.
+
+For the β^MOM estimator, the distribution appears to be concentrated around the mean value of approximately 0.005 and slightly right-skewed, as anticipated. The density plot shows a somewhat flatter distribution compared to a normal distribution, which is consistent with the negative kurtosis mentioned earlier.
+
+For the α^MOM estimator, the distribution is also concentrated around the mean value, which is close to 1. The histogram and density plot reveal that the distribution is fairly symmetric, as expected, with a shape similar to a normal distribution. This is in line with the near-zero skewness and kurtosis calculated earlier.
+
+In conclusion, the distribution of both estimators matches the expectations based on the summary statistics and analysis in Question 8. The β^MOM estimator has a slightly skewed and flatter distribution, while the α^MOM estimator has a more symmetric and normal-like distribution.
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+
+<span style="color: blue;">
+10. Calculate the Coefficient of Variation (CV) for each estimator ($\hat{\alpha}$ and $\hat{\beta}$). Which estimator has the larger relative variation?</span>
+
+
+```{r}
+
+# Calculate the CV for beta
+cv(betahat)
+
+# Calculate the CV for alpha
+cv(alphahat)
+
+```
+<br>
+<br>
+
+
+
+The coefficient of variation (CV) is calculated for each estimator (α^MOM and β^MOM) to measure the relative variability of the estimators. The CV is the ratio of the standard deviation to the mean, expressed as a percentage. The results are as follows:
+
+- CV for β^MOM: 0.04170685 (approximately 4.17%)
+- CV for α^MOM: 0.0377303 (approximately 3.77%)
+
+Based on these results, the β^MOM estimator has a larger relative variation compared to the α^MOM estimator. This means that the β^MOM estimator shows more variability relative to its mean value compared to the α^MOM estimator. In practical terms, this indicates that the precision of the β^MOM estimator is slightly lower than that of the α^MOM estimator.
+
+<br>
+<br>
+<br>
+<br>
+
+
+<span style="color: blue;">
+11. If you had a larger sample size in Question 4 (the value in the size option of the code), how would you expect the distribution of your estimators to change? </span>
+
+
+
+
+If a larger sample size was used in Question 4, the distribution of the estimators would likely become more concentrated around the true parameter values. As the sample size increases, the precision of the estimators generally improves, which results in a smaller standard deviation and narrower distribution for both α^MOM and β^MOM. Additionally, the central limit theorem implies that, with larger sample sizes, the distribution of the estimators would tend to be closer to a normal distribution, provided the underlying population is not highly skewed or has extreme outliers.
+<br>
+<br>
+<br>
+<br>
+
+
+
+<span style="color: blue;">
+12. If you had a smaller number of REPLICATIONS in Question 4 (the value after "i in 1:zzzz"), how would you expect the distribution of your estimators to change? </span>
+
+
+
+
+If a smaller number of replications were used in Question 4, the distribution of the estimators would be less stable and potentially less accurate in approximating the true parameter values. This is because a smaller number of replications means that fewer samples are used to calculate the estimators, leading to greater variability and uncertainty in the resulting distribution of the estimators. Consequently, the standard deviation might be larger, and the distribution of the estimators might deviate more from normality.
+<br>
+<br>
+<br>
+<br>
+<br>
+
+
+<span style="color: blue;">
+13. The above analysis (Questions 4 - 10) is a statistical technique called bootstrapping.  Using this analysis, in your own words, define bootstrapping and outline the basic steps of this technique. </span>
+
+
+
+Bootstrapping is a resampling-based statistical technique used to estimate the sampling distribution of a statistic by repeatedly drawing samples (with replacement) from the original data and calculating the statistic of interest for each resampled dataset. The basic steps of bootstrapping are as follows:
+1. Obtain an original sample from the population.
+
+2. Draw a random sample with replacement from the original sample, keeping the sample size the same as the original sample.
+
+3. Calculate the statistic of interest (e.g., mean, median, standard deviation, etc.) for the resampled dataset.
+
+4. Repeat steps 2 and 3 a large number of times (e.g., 1,000 or 10,000 replications) to obtain a large set of the statistic of interest.
+
+5. Analyze the distribution of the statistic obtained from the resampled datasets, which approximates the sampling distribution of the statistic. This can be used to estimate confidence intervals, standard errors, or other measures of uncertainty for the statistic of interest.
+
+Bootstrapping is particularly useful when the underlying population distribution is unknown, or when the sample size is small, making it difficult to rely on parametric methods or traditional statistical techniques.
+<br>
+<br>
+<br>
+<br>
+
+
+<br>
+<br>
